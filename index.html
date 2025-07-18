@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>6-Move Chess Challenge</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        body.modal-open {
+            overflow: hidden;
+        }
+        .chess-board-wrapper {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            grid-template-rows: 1fr auto;
+            gap: 0.5rem;
+            width: 100%;
+            max-width: 600px;
+        }
+        .rank-labels {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-around;
+            text-align: center;
+            font-family: 'Roboto Mono', monospace;
+            color: #9ca3af;
+        }
+        .file-labels {
+            display: flex;
+            justify-content: space-around;
+            text-align: center;
+            font-family: 'Roboto Mono', monospace;
+            color: #9ca3af;
+            grid-column-start: 2;
+        }
+        .chess-board {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            grid-template-rows: repeat(8, 1fr);
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            border-radius: 0.5rem;
+            overflow: hidden;
+            grid-column-start: 2;
+        }
+        .square {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: clamp(20px, 8vw, 48px);
+            user-select: none;
+        }
+        .light { background-color: #f0d9b5; }
+        .dark { background-color: #b58863; }
+        .selected { box-shadow: inset 0 0 0 4px #4f46e5; }
+        .possible-move::after {
+            content: '';
+            display: block;
+            width: 30%;
+            height: 30%;
+            border-radius: 50%;
+            background-color: rgba(107, 114, 128, 0.5);
+        }
+        .piece { cursor: pointer; }
+        .piece.black { color: #1f2937; }
+        .piece.white { color: #f9fafb; }
+
+        #radial-menu {
+            position: fixed;
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 100;
+            display: none;
+        }
+        .radial-item {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            background-color: rgba(42, 50, 66, 0.8);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            cursor: pointer;
+            pointer-events: all;
+            transition: transform 0.1s, background-color 0.1s;
+            border: 2px solid transparent;
+        }
+        .radial-item.highlighted {
+            background-color: #4f46e5;
+            transform: scale(1.2);
+            border-color: #fff;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-5xl mx-auto flex flex-col lg:flex-row gap-8">
+        
+        <div class="flex-grow flex flex-col items-center">
+            <h1 class="text-3xl font-bold mb-2 text-center">6-Move Chess Challenge</h1>
+            <div id="game-status" class="h-8 mb-2 text-xl font-semibold text-yellow-300">Setup a new game to begin!</div>
+            
+            <div class="chess-board-wrapper">
+                <div id="main-rank-labels" class="rank-labels"></div>
+                <div id="chess-board" class="chess-board shadow-2xl"></div>
+                <div class="file-labels" id="main-file-labels"></div>
+            </div>
+
+            <div class="w-full mt-4 flex justify-center">
+                <button id="new-game-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition-transform transform hover:scale-105">
+                    Setup New Game
+                </button>
+            </div>
+        </div>
+
+        <div class="w-full lg:w-80 flex-shrink-0 bg-gray-800 p-6 rounded-lg shadow-xl">
+            <h2 class="text-2xl font-bold border-b-2 border-gray-600 pb-2 mb-4">Game Info</h2>
+            <div class="space-y-4">
+                <div>
+                    <h3 class="text-lg font-semibold">Moves Remaining</h3>
+                    <div class="flex justify-between bg-gray-700 p-3 rounded-lg">
+                        <span>White: <strong id="white-moves" class="text-2xl">6</strong></span>
+                        <span>Black: <strong id="black-moves" class="text-2xl">6</strong></span>
+                    </div>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold">Points</h3>
+                    <div class="flex justify-between bg-gray-700 p-3 rounded-lg">
+                        <span>White: <strong id="white-score" class="text-2xl">0</strong></span>
+                        <span>Black: <strong id="black-score" class="text-2xl">0</strong></span>
+                    </div>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold">Last Move</h3>
+                    <div id="last-move" class="bg-gray-700 p-3 rounded-lg h-12 font-mono">--</div>
+                </div>
+            </div>
+            <div class="mt-6 pt-4 border-t border-gray-600">
+                <h3 class="text-lg font-bold mb-2">Points System</h3>
+                <ul class="text-sm space-y-1 text-gray-300">
+                    <li><strong>Checkmate:</strong> Instant Win</li>
+                    <li><strong>Queen:</strong> 9 points</li>
+                    <li><strong>Rook:</strong> 5 points</li>
+                    <li><strong>Bishop/Knight:</strong> 3 points</li>
+                    <li><strong>Pawn:</strong> 1 point</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div id="setup-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-gray-800 rounded-2xl shadow-2xl p-8 w-full max-w-4xl transform scale-100 overflow-y-auto max-h-full">
+            <h2 class="text-3xl font-bold text-center mb-6">Rapid Board Setup</h2>
+            <p class="text-center text-gray-400 mb-4">Press and hold on a square, then drag to a piece to place it.</p>
+            
+            <div class="flex flex-col md:flex-row gap-6">
+                <div class="flex-grow">
+                     <div class="chess-board-wrapper">
+                        <div id="setup-rank-labels" class="rank-labels"></div>
+                        <div id="setup-board" class="chess-board border-gray-600"></div>
+                        <div id="setup-file-labels" class="file-labels"></div>
+                    </div>
+                </div>
+
+                <div class="w-full md:w-56 flex-shrink-0">
+                    <div class="space-y-6">
+                        <div>
+                            <h3 class="text-xl font-semibold mb-2">Play As</h3>
+                            <div id="color-selector" class="flex bg-gray-900 rounded-lg p-1">
+                                <button data-color="w" class="w-1/2 py-2 rounded-md text-gray-300 bg-indigo-600 text-white">White</button>
+                                <button data-color="b" class="w-1/2 py-2 rounded-md text-gray-300">Black</button>
+                            </div>
+                        </div>
+
+                        <div class="space-y-3">
+                            <button id="start-game-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg">Start Game</button>
+                            <button id="clear-board-btn" class="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg">Clear Board</button>
+                            <button id="reset-standard-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Standard Position</button>
+                            <button id="cancel-setup-btn" class="w-full bg-red-600 hover:red-700 text-white font-bold py-2 px-4 rounded-lg mt-2">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="radial-menu"></div>
+
+    <script>
+        // --- DOM Elements ---
+        const getEl = (id) => document.getElementById(id);
+        const gameStatusElement = getEl('game-status');
+        const whiteMovesElement = getEl('white-moves');
+        const blackMovesElement = getEl('black-moves');
+        const whiteScoreElement = getEl('white-score');
+        const blackScoreElement = getEl('black-score');
+        const lastMoveElement = getEl('last-move');
+        const newGameBtn = getEl('new-game-btn');
+        const setupModal = getEl('setup-modal');
+        const startGameBtn = getEl('start-game-btn');
+        const clearBoardBtn = getEl('clear-board-btn');
+        const resetStandardBtn = getEl('reset-standard-btn');
+        const cancelSetupBtn = getEl('cancel-setup-btn');
+        const colorSelector = getEl('color-selector');
+        const radialMenu = getEl('radial-menu');
+
+        // --- Game State ---
+        let chess = new Chess();
+        let playerColor = 'w';
+        let selectedSquare = null;
+        let whiteMoves = 6;
+        let blackMoves = 6;
+        let whiteScore = 0;
+        let blackScore = 0;
+        let gameOver = true;
+
+        // --- Setup State ---
+        let setupBoardState = {};
+        let activeRadialTarget = null;
+
+        // --- Constants ---
+        const PIECE_VALUES = { 'p': 1, 'n': 3, 'b': 3, 'r': 5, 'q': 9, 'k': 900 };
+        const PIECE_UNICODE = {
+            'wP': '♙', 'wN': '♘', 'wB': '♗', 'wR': '♖', 'wQ': '♕', 'wK': '♔',
+            'bP': '♟', 'bN': '♞', 'bB': '♝', 'bR': '♜', 'bQ': '♛', 'bK': '♚'
+        };
+        const RADIAL_PIECES = [
+            'wK', 'wQ', 'wR', 'wB', 'wN', 'wP', null,
+            'bK', 'bQ', 'bR', 'bB', 'bN', 'bP'
+        ];
+
+        // --- Core Game Logic ---
+        function renderBoard(elementId, boardInstance) {
+            const boardElement = getEl(elementId);
+            if (!boardElement) return;
+            boardElement.innerHTML = '';
+            const board = boardInstance.board();
+            for (let i = 0; i < 8; i++) {
+                for (let j = 0; j < 8; j++) {
+                    const squareEl = document.createElement('div');
+                    const squareName = 'abcdefgh'[j] + (8 - i);
+                    squareEl.className = `square ${(i + j) % 2 === 0 ? 'light' : 'dark'}`;
+                    squareEl.dataset.square = squareName;
+                    
+                    const piece = board[i][j];
+                    if (piece) {
+                        const pieceElement = document.createElement('span');
+                        pieceElement.className = `piece ${piece.color === 'w' ? 'white' : 'black'}`;
+                        pieceElement.innerText = PIECE_UNICODE[piece.color + piece.type.toUpperCase()];
+                        squareEl.appendChild(pieceElement);
+                    }
+                    if (elementId === 'chess-board') {
+                        squareEl.addEventListener('click', () => onSquareClick(squareName));
+                    }
+                    boardElement.appendChild(squareEl);
+                }
+            }
+            if (selectedSquare) {
+                getEl(selectedSquare)?.classList.add('selected');
+                highlightPossibleMoves(selectedSquare);
+            }
+        }
+
+        function onSquareClick(squareName) {
+            if (gameOver || chess.turn() !== playerColor) return;
+            if (selectedSquare) {
+                const move = { from: selectedSquare, to: squareName, promotion: 'q' };
+                const result = chess.move(move);
+                if (result) handleMove(result);
+                selectedSquare = null;
+                renderBoard('chess-board', chess);
+            } else {
+                const piece = chess.get(squareName);
+                if (piece && piece.color === playerColor) {
+                    selectedSquare = squareName;
+                    renderBoard('chess-board', chess);
+                }
+            }
+        }
+        
+        function handleMove(move) {
+            updateScore(move);
+            updateMovesCount();
+            lastMoveElement.textContent = move.san;
+            renderBoard('chess-board', chess);
+            updateGameStatus();
+            if (!gameOver) {
+                gameStatusElement.textContent = "AI is thinking...";
+                window.setTimeout(makeAIMove, 250);
+            }
+        }
+
+        function makeAIMove() {
+            if (gameOver || chess.turn() === playerColor) return;
+            const moves = chess.moves({ verbose: true });
+            if (moves.length === 0) return;
+
+            let bestMove = null;
+            const isMaximizing = chess.turn() === 'w';
+            let bestValue = isMaximizing ? -Infinity : Infinity;
+            const depth = 3;
+
+            for (const move of moves) {
+                chess.move(move);
+                const boardValue = minimax(new Chess(chess.fen()), depth - 1, -Infinity, Infinity, !isMaximizing);
+                chess.undo();
+                if (isMaximizing ? (boardValue > bestValue) : (boardValue < bestValue)) {
+                    bestValue = boardValue;
+                    bestMove = move;
+                }
+            }
+            if (!bestMove) bestMove = moves[Math.floor(Math.random() * moves.length)];
+            
+            const result = chess.move(bestMove.san);
+            if(result) handleMove(result);
+        }
+
+        function minimax(game, depth, alpha, beta, maximizingPlayer) {
+            if (depth === 0 || game.game_over()) return evaluateBoard(game.board());
+            const moves = game.moves();
+            if (maximizingPlayer) {
+                let maxEval = -Infinity;
+                for (const move of moves) {
+                    game.move(move);
+                    const evaluation = minimax(game, depth - 1, alpha, beta, false);
+                    game.undo();
+                    maxEval = Math.max(maxEval, evaluation);
+                    alpha = Math.max(alpha, evaluation);
+                    if (beta <= alpha) break;
+                }
+                return maxEval;
+            } else {
+                let minEval = Infinity;
+                for (const move of moves) {
+                    game.move(move);
+                    const evaluation = minimax(game, depth - 1, alpha, beta, true);
+                    game.undo();
+                    minEval = Math.min(minEval, evaluation);
+                    beta = Math.min(beta, evaluation);
+                    if (beta <= alpha) break;
+                }
+                return minEval;
+            }
+        }
+
+        function evaluateBoard(board) {
+            let totalEvaluation = 0;
+            board.forEach(row => row.forEach(piece => {
+                if (piece) totalEvaluation += (PIECE_VALUES[piece.type] || 0) * (piece.color === 'w' ? 1 : -1);
+            }));
+            return totalEvaluation;
+        }
+
+        function updateScore(move) {
+            if (move.captured) {
+                const pieceValue = PIECE_VALUES[move.captured];
+                if (move.color === 'w') whiteScore += pieceValue;
+                else blackScore += pieceValue;
+                whiteScoreElement.textContent = whiteScore;
+                blackScoreElement.textContent = blackScore;
+            }
+        }
+
+        function updateMovesCount() {
+            if (chess.turn() === 'b') whiteMoves--;
+            else blackMoves--;
+            whiteMovesElement.textContent = whiteMoves;
+            blackMovesElement.textContent = blackMoves;
+        }
+
+        function updateGameStatus() {
+            let status = '';
+            if (chess.isCheckmate()) {
+                status = `Checkmate! ${chess.turn() === 'w' ? 'Black' : 'White'} wins.`;
+                gameOver = true;
+            } else if (chess.isDraw() || chess.isStalemate() || chess.isThreefoldRepetition()) {
+                status = 'Game over: Draw.';
+                gameOver = true;
+            } else if (whiteMoves <= 0 && blackMoves <= 0) {
+                 gameOver = true;
+                 if (whiteScore > blackScore) status = "Game Over! White wins on points.";
+                 else if (blackScore > whiteScore) status = "Game Over! Black wins on points.";
+                 else status = "Game Over! It's a draw on points.";
+            } else {
+                const turnColor = chess.turn() === 'w' ? 'White' : 'Black';
+                const playerIdentifier = chess.turn() === playerColor ? '(Your Turn)' : '(AI\'s Turn)';
+                status = `${turnColor}'s Turn ${playerIdentifier}`;
+                if(chess.inCheck()) status += ' (Check)';
+            }
+            gameStatusElement.textContent = status;
+        }
+
+        // --- Board Setup Logic ---
+        function showSetupModal() {
+            document.body.classList.add('modal-open');
+            setupBoardState = {};
+            renderSetupBoard();
+            populateLabels('setup-rank-labels', 'setup-file-labels');
+            setupModal.classList.remove('hidden');
+        }
+
+        function hideSetupModal() {
+            document.body.classList.remove('modal-open');
+            setupModal.classList.add('hidden');
+        }
+
+        function renderSetupBoard() {
+            const setupBoardElement = getEl('setup-board');
+            setupBoardElement.innerHTML = '';
+            for (let i = 0; i < 8; i++) {
+                for (let j = 0; j < 8; j++) {
+                    const squareEl = document.createElement('div');
+                    const squareName = 'abcdefgh'[j] + (8 - i);
+                    squareEl.className = `square ${(i + j) % 2 === 0 ? 'light' : 'dark'}`;
+                    squareEl.dataset.square = squareName;
+                    
+                    if (setupBoardState[squareName]) {
+                        const pieceKey = setupBoardState[squareName];
+                        squareEl.innerHTML = `<span class="piece ${pieceKey.startsWith('w') ? 'white' : 'black'}">${PIECE_UNICODE[pieceKey]}</span>`;
+                    }
+                    setupBoardElement.appendChild(squareEl);
+                }
+            }
+        }
+        
+        function generateFenFromSetup() {
+            let fen = '';
+            let whiteKing = false, blackKing = false;
+            for (let i = 8; i >= 1; i--) {
+                let emptyCount = 0;
+                for (let j = 0; j < 8; j++) {
+                    const squareName = 'abcdefgh'[j] + i;
+                    const pieceKey = setupBoardState[squareName];
+                    if (pieceKey) {
+                        if (emptyCount > 0) fen += emptyCount;
+                        emptyCount = 0;
+                        const color = pieceKey[0];
+                        const type = pieceKey[1];
+                        fen += color === 'w' ? type.toUpperCase() : type.toLowerCase();
+                        if (type === 'K') {
+                            if (color === 'w') whiteKing = true; else blackKing = true;
+                        }
+                    } else {
+                        emptyCount++;
+                    }
+                }
+                if (emptyCount > 0) fen += emptyCount;
+                if (i > 1) fen += '/';
+            }
+            if (!whiteKing || !blackKing) {
+                alert("Invalid position: Both a white and a black king must be on the board.");
+                return null;
+            }
+            fen += ` ${playerColor} - - 0 1`;
+            return fen;
+        }
+
+        // --- Radial Menu Logic ---
+        function showRadialMenu(x, y, targetSquare) {
+            radialMenu.innerHTML = '';
+            radialMenu.style.display = 'block';
+            radialMenu.style.left = `${x - 75}px`;
+            radialMenu.style.top = `${y - 75}px`;
+            activeRadialTarget = targetSquare;
+
+            const angleStep = 360 / RADIAL_PIECES.length;
+            RADIAL_PIECES.forEach((pieceKey, index) => {
+                const angle = angleStep * index - 90;
+                const itemX = 60 * Math.cos(angle * Math.PI / 180);
+                const itemY = 60 * Math.sin(angle * Math.PI / 180);
+
+                const item = document.createElement('div');
+                item.className = 'radial-item';
+                item.style.transform = `translate(${itemX}px, ${itemY}px)`;
+                item.dataset.piece = pieceKey;
+
+                if (pieceKey) {
+                    item.innerHTML = `<span class="piece ${pieceKey.startsWith('w') ? 'white' : 'black'}">${PIECE_UNICODE[pieceKey]}</span>`;
+                } else {
+                    item.innerHTML = `<span class="text-red-500 text-4xl">×</span>`;
+                }
+                radialMenu.appendChild(item);
+            });
+        }
+
+        function hideRadialMenu() {
+            radialMenu.style.display = 'none';
+            activeRadialTarget = null;
+        }
+
+        function handleRadialSelection(selectedPiece) {
+            if (activeRadialTarget) {
+                if (selectedPiece) {
+                    setupBoardState[activeRadialTarget] = selectedPiece;
+                } else {
+                    delete setupBoardState[activeRadialTarget];
+                }
+                renderSetupBoard();
+            }
+        }
+
+        function populateLabels(rankId, fileId) {
+            const rankContainer = getEl(rankId);
+            const fileContainer = getEl(fileId);
+            if (!rankContainer || !fileContainer) return;
+            rankContainer.innerHTML = '';
+            fileContainer.innerHTML = '';
+            '87654321'.split('').forEach(r => {
+                const label = document.createElement('div');
+                label.textContent = r;
+                rankContainer.appendChild(label);
+            });
+            'abcdefgh'.split('').forEach(f => {
+                const label = document.createElement('div');
+                label.textContent = f;
+                fileContainer.appendChild(label);
+            });
+        }
+        
+        // --- Event Listeners ---
+        newGameBtn.addEventListener('click', showSetupModal);
+        cancelSetupBtn.addEventListener('click', hideSetupModal);
+        
+        getEl('setup-board').addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            const target = e.target.closest('.square');
+            if(target) showRadialMenu(e.clientX, e.clientY, target.dataset.square);
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (radialMenu.style.display === 'block') {
+                document.querySelectorAll('.radial-item').forEach(item => {
+                    const rect = item.getBoundingClientRect();
+                    item.classList.toggle('highlighted', e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom);
+                });
+            }
+        });
+        
+        window.addEventListener('mouseup', () => {
+            if (radialMenu.style.display === 'block') {
+                const highlightedItem = document.querySelector('.radial-item.highlighted');
+                if (highlightedItem) {
+                    handleRadialSelection(highlightedItem.dataset.piece === 'null' ? null : highlightedItem.dataset.piece);
+                }
+                hideRadialMenu();
+            }
+        });
+
+        colorSelector.addEventListener('click', (e) => {
+            if (e.target.tagName === 'BUTTON') {
+                playerColor = e.target.dataset.color;
+                document.querySelectorAll('#color-selector button').forEach(btn => {
+                    btn.classList.remove('bg-indigo-600', 'text-white');
+                });
+                e.target.classList.add('bg-indigo-600', 'text-white');
+            }
+        });
+
+        clearBoardBtn.addEventListener('click', () => {
+            setupBoardState = {};
+            renderSetupBoard();
+        });
+
+        resetStandardBtn.addEventListener('click', () => {
+            const tempChess = new Chess();
+            setupBoardState = {};
+            tempChess.board().forEach((row, rIdx) => {
+                row.forEach((p, fIdx) => {
+                    if (p) {
+                        const square = 'abcdefgh'[fIdx] + (8 - rIdx);
+                        setupBoardState[square] = p.color + p.type.toUpperCase();
+                    }
+                });
+            });
+            renderSetupBoard();
+        });
+
+        startGameBtn.addEventListener('click', () => {
+            const fen = generateFenFromSetup();
+            if (fen) {
+                hideSetupModal();
+                chess = new Chess(fen);
+                
+                selectedSquare = null;
+                whiteMoves = 6;
+                blackMoves = 6;
+                whiteScore = 0;
+                blackScore = 0;
+                gameOver = false;
+
+                whiteMovesElement.textContent = whiteMoves;
+                blackMovesElement.textContent = blackMoves;
+                whiteScoreElement.textContent = whiteScore;
+                blackScoreElement.textContent = blackScore;
+                lastMoveElement.textContent = '--';
+                
+                renderBoard('chess-board', chess);
+                updateGameStatus();
+
+                if (chess.turn() !== playerColor && !gameOver) {
+                    gameStatusElement.textContent = "AI is thinking...";
+                    window.setTimeout(makeAIMove, 250);
+                }
+            }
+        });
+
+        // --- Initial Load ---
+        renderBoard('chess-board', new Chess());
+        populateLabels('main-rank-labels', 'main-file-labels');
+    </script>
+</body>
+</html>
