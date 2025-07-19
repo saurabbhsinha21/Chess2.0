@@ -170,10 +170,15 @@
                 const message = event.data;
                 if (message.startsWith('bestmove')) {
                     const bestMove = message.split(' ')[1];
-                    game.move(bestMove, { sloppy: true });
+                    const move = game.move(bestMove, { sloppy: true });
+                    if (move && move.captured) {
+                        scores.b += pieceValues[move.captured];
+                    }
                     board.position(game.fen());
                     updateStatus();
-                    startTimer(); // Start timer for white
+                    if (!game.game_over()) {
+                        startTimer(); // Start timer for white
+                    }
                 }
             };
             stockfish.postMessage('uci');
@@ -205,7 +210,7 @@
 
                 updateStatus();
                 
-                // Make a random legal move for black
+                // Make the engine move for black
                 if (!game.game_over()) {
                     statusEl.text('Stockfish is thinking...');
                     stockfish.postMessage('position fen ' + game.fen());
@@ -221,7 +226,6 @@
             }
 
             // Update the board position after the piece snap
-            // for castling, en passant, pawn promotion
             function onSnapEnd() {
                 board.position(game.fen());
             }
@@ -282,11 +286,18 @@
                         if (game.turn() === 'w'){
                             scores.w -= 1; // Missed turn penalty
                         }
-                        // Switch turns or handle as needed
-                        // For simplicity, we'll just let the other player move.
-                        game.load(game.fen().replace(game.turn(), game.turn() === 'w' ? 'b' : 'w'));
+                        
+                        // Force turn switch and let the engine move
+                        const currentFen = game.fen();
+                        const turnSwitchedFen = currentFen.replace(' w ', ' b ');
+                        game.load(turnSwitchedFen);
                         updateStatus();
-                        if(!game.game_over()) makeEngineMove();
+
+                        if (!game.game_over()) {
+                           statusEl.text('Stockfish is thinking...');
+                           stockfish.postMessage('position fen ' + game.fen());
+                           stockfish.postMessage('go depth 15');
+                        }
                     }
                 }, 1000);
             }
@@ -329,7 +340,7 @@
                 } else {
                     setupPanel.addClass('hidden');
                     setupModeBtn.text('Enter Setup').addClass('btn-secondary').removeClass('btn-primary');
-                    if (board.position() === {}){ // if board is empty
+                    if (Object.keys(board.position()).length === 0){ // if board is empty
                          game.reset();
                          board.position('start');
                     }
@@ -403,6 +414,7 @@
                 updateStatus();
                 startTimer();
                 $(this).prop('disabled', true);
+                resetGameBtn.prop('disabled', false);
             });
 
             resetGameBtn.on('click', resetGame);
