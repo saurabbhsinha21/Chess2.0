@@ -176,7 +176,7 @@
                     }
                     board.position(game.fen());
                     updateStatus();
-                    if (!game.game_over()) {
+                    if (!game.game_over() && moveCount <= maxMoves) {
                         startTimer(); // Start timer for white
                     }
                 }
@@ -187,7 +187,7 @@
             // --- Chessboard & Game Logic ---
             function onDragStart(source, piece, position, orientation) {
                 // Do not pick up pieces if the game is over or if it's not your turn
-                if (game.game_over() || isSetupMode || game.turn() !== 'w') {
+                if (game.game_over() || isSetupMode || game.turn() !== 'w' || moveCount > maxMoves) {
                     return false;
                 }
             }
@@ -201,7 +201,10 @@
                 });
 
                 // Illegal move
-                if (move === null) return 'snapback';
+                if (move === null) {
+                    startTimer(); // Restart timer if move is invalid
+                    return 'snapback';
+                }
 
                 // Handle captures and update score
                 if (move.captured) {
@@ -211,7 +214,7 @@
                 updateStatus();
                 
                 // Make the engine move for black
-                if (!game.game_over()) {
+                if (!game.game_over() && moveCount <= maxMoves) {
                     statusEl.text('Stockfish is thinking...');
                     stockfish.postMessage('position fen ' + game.fen());
                     stockfish.postMessage('go depth 15');
@@ -235,19 +238,6 @@
                 let status = '';
                 const turn = game.turn() === 'w' ? 'White' : 'Black';
                 
-                if (game.in_checkmate()) {
-                    status = `Game over, ${turn} is in checkmate.`;
-                    stopTimer();
-                } else if (game.in_draw()) {
-                    status = 'Game over, drawn position';
-                    stopTimer();
-                } else {
-                    status = turn + "'s turn to move.";
-                    if (game.in_check()) {
-                        status += ' ' + turn + ' is in check.';
-                    }
-                }
-
                 if (game.turn() === 'w') {
                     moveCount++;
                 }
@@ -263,11 +253,21 @@
                     } else {
                         status += " It's a draw by score!";
                     }
-                    game.reset(); // End the game logically
+                } else if (game.in_checkmate()) {
+                    status = `Game over, ${turn} is in checkmate.`;
+                    stopTimer();
+                } else if (game.in_draw()) {
+                    status = 'Game over, drawn position';
+                    stopTimer();
+                } else {
+                    status = turn + "'s turn to move.";
+                    if (game.in_check()) {
+                        status += ' ' + turn + ' is in check.';
+                    }
                 }
 
                 statusEl.text(status);
-                moveCounterEl.text(`Moves: ${moveCount} / ${maxMoves}`);
+                moveCounterEl.text(`Moves: ${Math.min(moveCount, maxMoves)} / ${maxMoves}`);
                 whiteScoreEl.text(scores.w);
                 blackScoreEl.text(scores.b);
             }
@@ -293,7 +293,7 @@
                         game.load(turnSwitchedFen);
                         updateStatus();
 
-                        if (!game.game_over()) {
+                        if (!game.game_over() && moveCount <= maxMoves) {
                            statusEl.text('Stockfish is thinking...');
                            stockfish.postMessage('position fen ' + game.fen());
                            stockfish.postMessage('go depth 15');
@@ -358,11 +358,12 @@
                 setupPanel.addClass('hidden');
                 setupModeBtn.text('Enter Setup').addClass('btn-secondary').removeClass('btn-primary');
                 startGameBtn.prop('disabled', true);
+                resetGameBtn.prop('disabled', true);
                 stopTimer();
                 timeLeft = 30;
                 timerEl.text(`Time Left: ${timeLeft}s`);
                 updateStatus();
-                statusEl.text('Enter Setup Mode or start a standard game.');
+                statusEl.text('Enter Setup Mode to begin.');
             }
 
             // --- Main Initialization ---
@@ -411,7 +412,7 @@
                 }
                 moveCount = 0;
                 scores = { w: 0, b: 0 };
-                updateStatus();
+                updateStatus(); // This will increment moveCount to 1
                 startTimer();
                 $(this).prop('disabled', true);
                 resetGameBtn.prop('disabled', false);
@@ -427,8 +428,6 @@
             });
 
             // --- Initial Setup ---
-            updateStatus();
-            initializeSetupPieces();
             resetGame(); // Start with a fresh game state
         });
     </script>
