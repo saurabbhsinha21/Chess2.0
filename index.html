@@ -4,433 +4,867 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>6-Move Chess Challenge</title>
-    
-    <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- chessboard.js for the visual board -->
-    <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css"
-          xintegrity="sha384-q94+BZYoLrqA1IM77A2QXGO2uEmmrsML/2JugUCgh/spKEXOBdgL15sgBGUya/a7"
-          crossorigin="anonymous">
-          
-    <!-- Custom Font -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        /* Custom styles for a modern look and feel */
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #1a202c; /* Dark background */
-            color: #e2e8f0;
         }
-        .board-container {
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        /* Prevents body scrolling when a modal is open */
+        body.modal-open {
+            overflow: hidden;
         }
-        .control-panel {
-            background-color: #2d3748;
+        .chess-board {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            grid-template-rows: repeat(8, 1fr);
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            border: 2px solid #4a5568; /* gray-700 */
             border-radius: 0.5rem;
-            padding: 1.5rem;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            overflow: hidden;
         }
-        .btn {
-            transition: all 0.2s ease-in-out;
-            border-radius: 0.375rem;
-            padding: 0.5rem 1rem;
-            font-weight: 600;
+        .square {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: clamp(20px, 8vw, 48px);
+            user-select: none;
+        }
+        .light { background-color: #f0d9b5; }
+        .dark { background-color: #b58863; }
+        .selected { box-shadow: inset 0 0 0 4px #4f46e5; }
+        .last-move-highlight { background-color: rgba(252, 211, 77, 0.5) !important; }
+        .possible-move::after {
+            content: '';
+            display: block;
+            width: 30%;
+            height: 30%;
+            border-radius: 50%;
+            background-color: rgba(107, 114, 128, 0.5);
+        }
+        .piece { cursor: pointer; }
+        .piece.black { color: #1f2937; } /* gray-800 */
+        .piece.white { color: #f9fafb; } /* gray-50 */
+
+        /* Modal Styles */
+        .modal {
+            transition: opacity 0.25s ease;
+        }
+        .modal-content {
+            transition: transform 0.25s ease;
+        }
+        
+        /* Radial Menu Styles */
+        #radial-menu {
+            position: fixed;
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 100;
+            display: none;
+        }
+        .radial-item {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            background-color: rgba(42, 50, 66, 0.8);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
             cursor: pointer;
+            pointer-events: all;
+            transition: transform 0.1s, background-color 0.1s;
+            border: 2px solid transparent;
         }
-        .btn-primary {
-            background-color: #4299e1;
-            color: white;
-            border: 1px solid #4299e1;
-        }
-        .btn-primary:hover {
-            background-color: #3182ce;
-        }
-        .btn-secondary {
-            background-color: #4a5568;
-            color: white;
-            border: 1px solid #4a5568;
-        }
-        .btn-secondary:hover {
-            background-color: #2d3748;
-        }
-        .status-text {
-            color: #a0aec0;
-            font-size: 1.125rem;
-            font-weight: 500;
-        }
-        .highlight-white {
-            box-shadow: inset 0 0 3px 3px #a0aec0;
-        }
-        .highlight-black {
-            box-shadow: inset 0 0 3px 3px #667eea;
-        }
-        .setup-piece {
-            cursor: grab;
-            width: 45px;
-            height: 45px;
-            background-size: contain;
-        }
-        #setup-pieces-container {
-            background-color: #2d3748;
-            border-radius: 0.5rem;
+        .radial-item.highlighted {
+            background-color: #4f46e5;
+            transform: scale(1.2);
+            border-color: #fff;
         }
     </style>
 </head>
-<body class="flex items-center justify-center min-h-screen">
+<body class="bg-gray-900 text-white flex flex-col items-center justify-center min-h-screen p-4">
 
-    <div class="container mx-auto p-4 max-w-6xl">
-        <h1 class="text-4xl font-bold text-center mb-6 text-white">6-Move Chess Challenge</h1>
-
-        <div class="flex flex-col lg:flex-row gap-6">
+    <div class="w-full max-w-5xl mx-auto flex flex-col lg:flex-row gap-8">
+        
+        <!-- Game Board and Info -->
+        <div class="flex-grow flex flex-col items-center">
+            <h1 class="text-3xl font-bold mb-2 text-center">6-Move Chess Challenge</h1>
+            <div id="game-status" class="h-8 mb-2 text-xl font-semibold text-yellow-300">Setup a new game to begin!</div>
             
-            <!-- Chessboard -->
-            <div id="board-container" class="board-container w-full lg:w-2/3">
-                <div id="myBoard" class="w-full"></div>
+            <div class="grid grid-cols-[auto_1fr] grid-rows-[1fr_auto] gap-x-2 gap-y-1 w-full max-w-[600px]">
+                <div id="main-rank-labels" class="flex flex-col justify-around text-center text-gray-400 text-sm font-mono"></div>
+                <div id="chess-board" class="chess-board shadow-2xl col-start-2"></div>
+                <div></div> <!-- empty corner -->
+                <div id="main-file-labels" class="flex justify-around text-center text-gray-400 text-sm font-mono col-start-2"></div>
             </div>
 
-            <!-- Control Panel -->
-            <div class="w-full lg:w-1/3 flex flex-col gap-4">
-                <div class="control-panel">
-                    <h2 class="text-2xl font-bold mb-4 border-b border-gray-600 pb-2">Game Info</h2>
-                    <div id="status" class="status-text mb-2 h-8">Enter Setup Mode to begin.</div>
-                    <div id="move-counter" class="text-lg text-gray-400">Moves: 0 / 6</div>
-                    <div id="timer" class="text-lg text-gray-400">Time Left: 30s</div>
-                    
-                    <div id="score-display" class="mt-4">
-                        <h3 class="text-xl font-semibold">Score</h3>
-                        <p>White (You): <span id="white-score">0</span></p>
-                        <p>Black (AI): <span id="black-score">0</span></p>
+            <div class="w-full mt-4 flex justify-center">
+                <button id="new-game-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition-transform transform hover:scale-105">
+                    Setup New Game
+                </button>
+            </div>
+        </div>
+
+        <!-- Game State & Rules -->
+        <div class="w-full lg:w-80 flex-shrink-0 bg-gray-800 p-6 rounded-lg shadow-xl">
+            <h2 class="text-2xl font-bold border-b-2 border-gray-600 pb-2 mb-4">Game Info</h2>
+            
+            <div class="space-y-4">
+                <div>
+                    <h3 class="text-lg font-semibold">Moves Remaining</h3>
+                    <div class="flex justify-between bg-gray-700 p-3 rounded-lg">
+                        <span>White: <strong id="white-moves" class="text-2xl">6</strong></span>
+                        <span>Black: <strong id="black-moves" class="text-2xl">6</strong></span>
                     </div>
                 </div>
 
-                <div class="control-panel">
-                    <h2 class="text-2xl font-bold mb-4 border-b border-gray-600 pb-2">Controls</h2>
-                    <div class="grid grid-cols-2 gap-4">
-                        <button id="setup-mode-btn" class="btn btn-secondary">Enter Setup</button>
-                        <button id="start-game-btn" class="btn btn-primary" disabled>Start Game</button>
-                        <button id="reset-game-btn" class="btn btn-secondary col-span-2">Reset Game</button>
+                <div>
+                    <h3 class="text-lg font-semibold">Points</h3>
+                    <div class="flex justify-between bg-gray-700 p-3 rounded-lg">
+                        <span>White: <strong id="white-score" class="text-2xl">0</strong></span>
+                        <span>Black: <strong id="black-score" class="text-2xl">0</strong></span>
                     </div>
                 </div>
 
-                <!-- Setup Mode Panel -->
-                <div id="setup-panel" class="control-panel hidden">
-                    <h2 class="text-2xl font-bold mb-2">Board Setup</h2>
-                    <p class="text-gray-400 mb-4">Drag pieces to the board. Click "Start Game" when ready.</p>
-                    <div id="setup-pieces-container" class="p-2 grid grid-cols-6 gap-1">
-                        <!-- Pieces will be added here by JS -->
-                    </div>
-                    <button id="clear-board-btn" class="btn btn-secondary w-full mt-4">Clear Board</button>
+                <div>
+                    <h3 class="text-lg font-semibold">Last Move</h3>
+                    <div id="last-move" class="bg-gray-700 p-3 rounded-lg h-12 font-mono">--</div>
                 </div>
+            </div>
+
+            <div class="mt-6 pt-4 border-t border-gray-600">
+                <h3 class="text-lg font-bold mb-2">Points System</h3>
+                <ul class="text-sm space-y-1 text-gray-300">
+                    <li><strong>Checkmate:</strong> Instant Win</li>
+                    <li><strong>Queen:</strong> 9 points</li>
+                    <li><strong>Rook:</strong> 5 points</li>
+                    <li><strong>Bishop/Knight:</strong> 3 points</li>
+                    <li><strong>Pawn:</strong> 1 point</li>
+                </ul>
             </div>
         </div>
     </div>
 
-    <!-- Required Libraries -->
-    <script src="https://code.jquery.com/jquery-3.5.1.min.js"
-            xintegrity="sha384-ZvpUoO/+PpLXR1lu4jmpXWu80pZlYUAfxl5sbJ5TTIBiCIb5E瞰YLIAD3HeKRd"
-            crossorigin="anonymous"></script>
-    <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"
-            xintegrity="sha384-8Vi8VHwn3vjQ9eUHUxex3JSN/NFqUg3iGDVEH3eTkecd5AwrEMxgSMUBEhSwC6UP"
-            crossorigin="anonymous"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.2/chess.min.js"></script>
+    <!-- Board Setup Modal -->
+    <div id="setup-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 z-50 opacity-0 pointer-events-none">
+        <div id="modal-content" class="bg-gray-800 rounded-2xl shadow-2xl p-8 w-full max-w-4xl transform scale-95 overflow-y-auto max-h-full">
+            <h2 class="text-3xl font-bold text-center mb-6">Collaborative Setup</h2>
+            <p class="text-center text-gray-400 mb-4">Share the Session ID with a friend to set up the board together in real-time.</p>
+            
+            <div class="flex flex-col md:flex-row gap-6">
+                <!-- Setup Board -->
+                <div class="flex-grow">
+                     <div class="grid grid-cols-[auto_1fr] grid-rows-[1fr_auto] gap-x-2 gap-y-1 w-full">
+                        <div id="setup-rank-labels" class="flex flex-col justify-around text-center text-gray-400 text-sm font-mono"></div>
+                        <div id="setup-board" class="chess-board border-gray-600 col-start-2"></div>
+                        <div></div> <!-- empty corner -->
+                        <div id="setup-file-labels" class="flex justify-around text-center text-gray-400 text-sm font-mono col-start-2"></div>
+                    </div>
+                </div>
 
-    <script>
-        $(document).ready(function () {
-            // --- Global Variables ---
-            let board = null;
-            let game = new Chess();
-            let stockfish = new Worker('https://stockfish.online/stockfish.js');
-            let isSetupMode = false;
-            let moveCount = 0;
-            const maxMoves = 6;
-            let scores = { w: 0, b: 0 };
-            let timerId = null;
-            let timeLeft = 30;
+                <!-- Controls -->
+                <div class="w-full md:w-56 flex-shrink-0">
+                    <div id="setup-controls" class="space-y-6">
+                        <div>
+                            <h3 class="text-xl font-semibold mb-2">Session ID</h3>
+                            <div class="bg-gray-900 p-2 rounded-lg text-center">
+                                <span id="session-id-display" class="font-mono text-lg text-yellow-300"></span>
+                            </div>
+                        </div>
+                         <div>
+                            <h3 class="text-xl font-semibold mb-2">Join Session</h3>
+                            <div class="flex gap-2">
+                                <input type="text" id="join-session-input" class="w-full bg-gray-700 text-white rounded-lg p-2 text-sm" placeholder="Paste ID...">
+                                <button id="join-session-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold p-2 rounded-lg">Join</button>
+                            </div>
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-semibold mb-2">Play As</h3>
+                            <div id="color-selector" class="flex bg-gray-900 rounded-lg p-1">
+                                <button data-color="w" class="w-1/2 py-2 rounded-md text-white bg-indigo-600">White</button>
+                                <button data-color="b" class="w-1/2 py-2 rounded-md text-gray-300">Black</button>
+                            </div>
+                        </div>
 
-            const pieceValues = { p: 1, n: 3, b: 3, r: 5, q: 9 };
+                        <div class="space-y-3">
+                            <button id="start-game-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition-transform transform hover:scale-105">Start Game</button>
+                            <button id="clear-board-btn" class="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg">Clear Board</button>
+                             <button id="reset-standard-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Standard Position</button>
+                            <button id="cancel-setup-btn" class="w-full bg-red-600 hover:red-700 text-white font-bold py-2 px-4 rounded-lg mt-2">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="radial-menu"></div>
 
-            // --- UI Elements ---
-            const statusEl = $('#status');
-            const moveCounterEl = $('#move-counter');
-            const timerEl = $('#timer');
-            const whiteScoreEl = $('#white-score');
-            const blackScoreEl = $('#black-score');
-            const setupModeBtn = $('#setup-mode-btn');
-            const startGameBtn = $('#start-game-btn');
-            const resetGameBtn = $('#reset-game-btn');
-            const setupPanel = $('#setup-panel');
-            const clearBoardBtn = $('#clear-board-btn');
+    <script type="module">
+        // --- Firebase Imports ---
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot, addDoc, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-            // --- Stockfish Engine Communication ---
-            stockfish.onmessage = function (event) {
-                const message = event.data;
-                if (message.startsWith('bestmove')) {
-                    const bestMove = message.split(' ')[1];
-                    const move = game.move(bestMove, { sloppy: true });
-                    if (move && move.captured) {
-                        scores.b += pieceValues[move.captured];
+        // --- DOM Elements ---
+        const boardElement = document.getElementById('chess-board');
+        const setupBoardElement = document.getElementById('setup-board');
+        const gameStatusElement = document.getElementById('game-status');
+        const whiteMovesElement = document.getElementById('white-moves');
+        const blackMovesElement = document.getElementById('black-moves');
+        const whiteScoreElement = document.getElementById('white-score');
+        const blackScoreElement = document.getElementById('black-score');
+        const lastMoveElement = document.getElementById('last-move');
+        const newGameBtn = document.getElementById('new-game-btn');
+        
+        // Modal elements
+        const setupModal = document.getElementById('setup-modal');
+        const modalContent = document.getElementById('modal-content');
+        const colorSelector = document.getElementById('color-selector');
+        const startGameBtn = document.getElementById('start-game-btn');
+        const clearBoardBtn = document.getElementById('clear-board-btn');
+        const resetStandardBtn = document.getElementById('reset-standard-btn');
+        const cancelSetupBtn = document.getElementById('cancel-setup-btn');
+        const radialMenu = document.getElementById('radial-menu');
+        const sessionIdDisplay = document.getElementById('session-id-display');
+        const joinSessionInput = document.getElementById('join-session-input');
+        const joinSessionBtn = document.getElementById('join-session-btn');
+        
+        // --- Firebase State ---
+        let db, auth;
+        let currentSessionId = null;
+        let unsubscribeFromSession = null;
+
+        // --- Game State ---
+        let chess = new Chess();
+        let playerColor = 'w';
+        let selectedSquare = null;
+        let whiteMoves = 6;
+        let blackMoves = 6;
+        let whiteScore = 0;
+        let blackScore = 0;
+        let gameOver = true;
+        let lastMove = null;
+        let aiWorker;
+
+        // --- Setup State ---
+        let setupBoardState = {};
+        let activeRadialTarget = null;
+
+        // --- Constants ---
+        const PIECE_VALUES = { 'p': 100, 'n': 320, 'b': 330, 'r': 500, 'q': 900, 'k': 20000 };
+        const PIECE_UNICODE = {
+            'wP': '♙', 'wN': '♘', 'wB': '♗', 'wR': '♖', 'wQ': '♕', 'wK': '♔',
+            'bP': '♟', 'bN': '♞', 'bB': '♝', 'bR': '♜', 'bQ': '♛', 'bK': '♚'
+        };
+        const RADIAL_PIECES = [
+            'wP', 'wN', 'wB', 'wR', 'wQ', 'wK',
+            'bP', 'bN', 'bB', 'bR', 'bQ', 'bK',
+            null // For eraser
+        ];
+
+        // --- AI Worker Setup ---
+        function createAIWorker() {
+            const workerCode = `
+                self.importScripts("https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js");
+
+                const PIECE_VALUES = { 'p': 100, 'n': 320, 'b': 330, 'r': 500, 'q': 900, 'k': 20000 };
+                const pieceSquareTables = {
+                    p: [[0,0,0,0,0,0,0,0],[50,50,50,50,50,50,50,50],[10,10,20,30,30,20,10,10],[5,5,10,25,25,10,5,5],[0,0,0,20,20,0,0,0],[5,-5,-10,0,0,-10,-5,5],[5,10,10,-20,-20,10,10,5],[0,0,0,0,0,0,0,0]],
+                    n: [[-50,-40,-30,-30,-30,-30,-40,-50],[-40,-20,0,0,0,0,-20,-40],[-30,0,10,15,15,10,0,-30],[-30,5,15,20,20,15,5,-30],[-30,0,15,20,20,15,0,-30],[-30,5,10,15,15,10,5,-30],[-40,-20,0,5,5,0,-20,-40],[-50,-40,-30,-30,-30,-30,-40,-50]],
+                    b: [[-20,-10,-10,-10,-10,-10,-10,-20],[-10,0,0,0,0,0,0,-10],[-10,0,5,10,10,5,0,-10],[-10,5,5,10,10,5,5,-10],[-10,0,10,10,10,10,0,-10],[-10,10,10,10,10,10,10,-10],[-10,5,0,0,0,0,5,-10],[-20,-10,-10,-10,-10,-10,-10,-20]],
+                    r: [[0,0,0,0,0,0,0,0],[5,10,10,10,10,10,10,5],[-5,0,0,0,0,0,0,-5],[-5,0,0,0,0,0,0,-5],[-5,0,0,0,0,0,0,-5],[-5,0,0,0,0,0,0,-5],[-5,0,0,0,0,0,0,-5],[0,0,0,5,5,0,0,0]],
+                    q: [[-20,-10,-10,-5,-5,-10,-10,-20],[-10,0,0,0,0,0,0,-10],[-10,0,5,5,5,5,0,-10],[-5,0,5,5,5,5,0,-5],[0,0,5,5,5,5,0,-5],[-10,5,5,5,5,5,0,-10],[-10,0,5,0,0,0,0,-10],[-20,-10,-10,-5,-5,-10,-10,-20]],
+                    k: [[-30,-40,-40,-50,-50,-40,-40,-30],[-30,-40,-40,-50,-50,-40,-40,-30],[-30,-40,-40,-50,-50,-40,-40,-30],[-30,-40,-40,-50,-50,-40,-40,-30],[-20,-30,-30,-40,-40,-30,-30,-20],[-10,-20,-20,-20,-20,-20,-20,-10],[20,20,0,0,0,0,20,20],[20,30,10,0,0,10,30,20]]
+                };
+
+                function evaluateBoard(board) {
+                    let totalEvaluation = 0;
+                    for (let i = 0; i < 8; i++) {
+                        for (let j = 0; j < 8; j++) {
+                            const piece = board[i][j];
+                            if (piece) {
+                                const value = PIECE_VALUES[piece.type] || 0;
+                                const pst = pieceSquareTables[piece.type];
+                                const positionalValue = piece.color === 'w' ? pst[i][j] : pst[7 - i][j];
+                                totalEvaluation += (value + positionalValue) * (piece.color === 'w' ? 1 : -1);
+                            }
+                        }
                     }
-                    board.position(game.fen());
-                    updateStatus();
-                    if (!game.game_over() && moveCount <= maxMoves) {
-                        startTimer(); // Start timer for white
-                    }
-                }
-            };
-            stockfish.postMessage('uci');
-            stockfish.postMessage('isready');
-
-            // --- Chessboard & Game Logic ---
-            function onDragStart(source, piece, position, orientation) {
-                // Do not pick up pieces if the game is over or if it's not your turn
-                if (game.game_over() || isSetupMode || game.turn() !== 'w' || moveCount > maxMoves) {
-                    return false;
-                }
-            }
-
-            function onDrop(source, target) {
-                stopTimer(); // Stop timer on move attempt
-                const move = game.move({
-                    from: source,
-                    to: target,
-                    promotion: 'q' // NOTE: always promote to a queen for simplicity
-                });
-
-                // Illegal move
-                if (move === null) {
-                    startTimer(); // Restart timer if move is invalid
-                    return 'snapback';
+                    return totalEvaluation;
                 }
 
-                // Handle captures and update score
-                if (move.captured) {
-                    scores.w += pieceValues[move.captured];
-                }
-
-                updateStatus();
-                
-                // Make the engine move for black
-                if (!game.game_over() && moveCount <= maxMoves) {
-                    statusEl.text('Stockfish is thinking...');
-                    stockfish.postMessage('position fen ' + game.fen());
-                    stockfish.postMessage('go depth 15');
-                }
-            }
-
-            // Called when a piece is dropped on the board during setup
-            function onDropSetup(source, target, piece) {
-                game.put({ type: piece.slice(1).toLowerCase(), color: piece.slice(0,1) }, target);
-                board.position(game.fen());
-                startGameBtn.prop('disabled', false);
-            }
-
-            // Update the board position after the piece snap
-            function onSnapEnd() {
-                board.position(game.fen());
-            }
-
-            // --- UI & Status Updates ---
-            function updateStatus() {
-                let status = '';
-                const turn = game.turn() === 'w' ? 'White' : 'Black';
-                
-                if (game.turn() === 'w') {
-                    moveCount++;
-                }
-
-                if (moveCount > maxMoves) {
-                    status = "Game Over! 6 moves completed.";
-                    stopTimer();
-                    // Determine winner by score
-                    if (scores.w > scores.b) {
-                        status += " White wins by score!";
-                    } else if (scores.b > scores.w) {
-                        status += " Black wins by score!";
+                function minimax(game, depth, alpha, beta, maximizingPlayer) {
+                    if (depth === 0 || game.game_over()) return evaluateBoard(game.board());
+                    const moves = game.moves();
+                    if (maximizingPlayer) {
+                        let maxEval = -Infinity;
+                        for (const move of moves) {
+                            game.move(move);
+                            const evaluation = minimax(game, depth - 1, alpha, beta, false);
+                            game.undo();
+                            maxEval = Math.max(maxEval, evaluation);
+                            alpha = Math.max(alpha, evaluation);
+                            if (beta <= alpha) break;
+                        }
+                        return maxEval;
                     } else {
-                        status += " It's a draw by score!";
-                    }
-                } else if (game.in_checkmate()) {
-                    status = `Game over, ${turn} is in checkmate.`;
-                    stopTimer();
-                } else if (game.in_draw()) {
-                    status = 'Game over, drawn position';
-                    stopTimer();
-                } else {
-                    status = turn + "'s turn to move.";
-                    if (game.in_check()) {
-                        status += ' ' + turn + ' is in check.';
+                        let minEval = Infinity;
+                        for (const move of moves) {
+                            game.move(move);
+                            const evaluation = minimax(game, depth - 1, alpha, beta, true);
+                            game.undo();
+                            minEval = Math.min(minEval, evaluation);
+                            beta = Math.min(beta, evaluation);
+                            if (beta <= alpha) break;
+                        }
+                        return minEval;
                     }
                 }
 
-                statusEl.text(status);
-                moveCounterEl.text(`Moves: ${Math.min(moveCount, maxMoves)} / ${maxMoves}`);
-                whiteScoreEl.text(scores.w);
-                blackScoreEl.text(scores.b);
-            }
+                self.onmessage = function(e) {
+                    const { fen, depth } = e.data;
+                    const game = new Chess(fen);
+                    const moves = game.moves();
+                    if (moves.length === 0) {
+                        self.postMessage(null);
+                        return;
+                    }
 
-            // --- Timer Logic ---
-            function startTimer() {
-                clearInterval(timerId);
-                timeLeft = 30;
-                timerEl.text(`Time Left: ${timeLeft}s`);
-                timerId = setInterval(() => {
-                    timeLeft--;
-                    timerEl.text(`Time Left: ${timeLeft}s`);
-                    if (timeLeft <= 0) {
-                        clearInterval(timerId);
-                        statusEl.text("Time's up! Turn forfeited.");
-                        if (game.turn() === 'w'){
-                            scores.w -= 1; // Missed turn penalty
-                        }
-                        
-                        // Force turn switch and let the engine move
-                        const currentFen = game.fen();
-                        const turnSwitchedFen = currentFen.replace(' w ', ' b ');
-                        game.load(turnSwitchedFen);
-                        updateStatus();
+                    let bestMove = null;
+                    const isMaximizing = game.turn() === 'w';
+                    let bestValue = isMaximizing ? -Infinity : Infinity;
 
-                        if (!game.game_over() && moveCount <= maxMoves) {
-                           statusEl.text('Stockfish is thinking...');
-                           stockfish.postMessage('position fen ' + game.fen());
-                           stockfish.postMessage('go depth 15');
+                    for (const move of moves) {
+                        game.move(move);
+                        const boardValue = minimax(game, depth - 1, -Infinity, Infinity, !isMaximizing);
+                        game.undo();
+                        if (isMaximizing) {
+                            if (boardValue > bestValue) {
+                                bestValue = boardValue;
+                                bestMove = move;
+                            }
+                        } else {
+                            if (boardValue < bestValue) {
+                                bestValue = boardValue;
+                                bestMove = move;
+                            }
                         }
                     }
-                }, 1000);
-            }
+                    self.postMessage(bestMove);
+                };
+            `;
+            const blob = new Blob([workerCode], { type: 'application/javascript' });
+            return new Worker(URL.createObjectURL(blob));
+        }
 
-            function stopTimer() {
-                clearInterval(timerId);
-            }
-
-            // --- Setup Mode ---
-            function initializeSetupPieces() {
-                const pieces = ['wP', 'wN', 'wB', 'wR', 'wQ', 'wK', 'bP', 'bN', 'bB', 'bR', 'bQ', 'bK'];
-                const container = $('#setup-pieces-container');
-                container.empty();
-                pieces.forEach(piece => {
-                    const pieceEl = $('<img>');
-                    pieceEl.attr('src', `https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/img/chesspieces/wikipedia/${piece}.png`);
-                    pieceEl.addClass('setup-piece');
-                    pieceEl.data('piece', piece);
-                    container.append(pieceEl);
-                });
-                 // Make setup pieces draggable
-                $('.setup-piece').draggable({
-                    helper: 'clone',
-                    appendTo: 'body',
-                    zIndex: 100
-                });
-            }
-
-            function toggleSetupMode() {
-                isSetupMode = !isSetupMode;
-                if (isSetupMode) {
-                    game.clear();
-                    board.clear();
-                    board.position(game.fen());
-                    setupPanel.removeClass('hidden');
-                    setupModeBtn.text('Exit Setup').addClass('btn-primary').removeClass('btn-secondary');
-                    startGameBtn.prop('disabled', false);
-                    statusEl.text('Drag pieces to the board to create a position.');
-                    stopTimer();
-                } else {
-                    setupPanel.addClass('hidden');
-                    setupModeBtn.text('Enter Setup').addClass('btn-secondary').removeClass('btn-primary');
-                    if (Object.keys(board.position()).length === 0){ // if board is empty
-                         game.reset();
-                         board.position('start');
-                    }
-                    statusEl.text('Setup complete. Press Start Game.');
-                }
-            }
-            
-            // --- Game Initialization & Reset ---
-            function resetGame() {
-                game.reset();
-                board.position('start');
-                moveCount = 0;
-                scores = { w: 0, b: 0 };
-                isSetupMode = false;
-                setupPanel.addClass('hidden');
-                setupModeBtn.text('Enter Setup').addClass('btn-secondary').removeClass('btn-primary');
-                startGameBtn.prop('disabled', true);
-                resetGameBtn.prop('disabled', true);
-                stopTimer();
-                timeLeft = 30;
-                timerEl.text(`Time Left: ${timeLeft}s`);
-                updateStatus();
-                statusEl.text('Enter Setup Mode to begin.');
-            }
-
-            // --- Main Initialization ---
-            const config = {
-                draggable: true,
-                position: 'start',
-                onDragStart: onDragStart,
-                onDrop: onDrop,
-                onSnapEnd: onSnapEnd,
-                pieceTheme: 'https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/img/chesspieces/wikipedia/{piece}.png'
+        // --- Firebase Initialization ---
+        async function initFirebase() {
+            const firebaseConfig = {
+                apiKey: "AIzaSyDOrHW9k1CdK0pEGEFHv1L6n6MHuZcAQuY",
+                authDomain: "chesstool-7ffb9.firebaseapp.com",
+                projectId: "chesstool-7ffb9",
+                storageBucket: "chesstool-7ffb9.appspot.com",
+                messagingSenderId: "281727838019",
+                appId: "1:281727838019:web:8dfdafdce812c7dd98b1f6",
+                measurementId: "G-PGJ3YNKMVT"
             };
-            board = Chessboard('myBoard', config);
-            $(window).resize(board.resize);
             
-            // Make the board droppable for setup pieces
-            $('#myBoard').droppable({
-                accept: '.setup-piece',
-                drop: function(event, ui) {
-                    if (!isSetupMode) return;
-                    const square = $(this).find('.square-55d63').not('.ui-droppable-hover');
-                    const squareWidth = square.width();
-                    const squareHeight = square.height();
-                    const boardOffset = $(this).offset();
-                    const dropX = event.pageX - boardOffset.left;
-                    const dropY = event.pageY - boardOffset.top;
+            try {
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                await signInAnonymously(auth);
+            } catch (e) {
+                console.error("Firebase initialization failed:", e);
+                alert(`Could not connect to the collaboration service. Error: ${e.message}`);
+            }
+        }
+
+        // --- Chess Logic ---
+
+        function renderBoard() {
+            boardElement.innerHTML = '';
+            const board = chess.board();
+            for (let i = 0; i < 8; i++) {
+                for (let j = 0; j < 8; j++) {
+                    const squareEl = document.createElement('div');
+                    const squareName = 'abcdefgh'[j] + (8 - i);
+                    squareEl.id = squareName;
+                    squareEl.className = `square ${(i + j) % 2 === 0 ? 'light' : 'dark'}`;
                     
-                    const col = Math.floor(dropX / squareWidth);
-                    const row = 7 - Math.floor(dropY / squareHeight);
-                    const file = 'abcdefgh'[col];
-                    const rank = row + 1;
-                    const targetSquare = file + rank;
+                    if (lastMove && (squareName === lastMove.from || squareName === lastMove.to)) {
+                        squareEl.classList.add('last-move-highlight');
+                    }
 
-                    const piece = ui.helper.data('piece');
-                    onDropSetup(null, targetSquare, piece);
+                    const piece = board[i][j];
+                    if (piece) {
+                        const pieceElement = document.createElement('span');
+                        pieceElement.className = `piece ${piece.color === 'w' ? 'white' : 'black'}`;
+                        pieceElement.innerText = PIECE_UNICODE[piece.color + piece.type.toUpperCase()];
+                        squareEl.appendChild(pieceElement);
+                    }
+
+                    squareEl.addEventListener('click', () => onSquareClick(squareName));
+                    boardElement.appendChild(squareEl);
                 }
-            });
+            }
 
-            // --- Event Listeners ---
-            setupModeBtn.on('click', toggleSetupMode);
+            if (selectedSquare) {
+                document.getElementById(selectedSquare)?.classList.add('selected');
+                highlightPossibleMoves(selectedSquare);
+            }
+        }
+
+        function onSquareClick(squareName) {
+            if (gameOver || chess.turn() !== playerColor) return;
+
+            if (selectedSquare) {
+                const move = { from: selectedSquare, to: squareName, promotion: 'q' };
+                const result = chess.move(move);
+                if (result) {
+                    handleMove(result);
+                }
+                selectedSquare = null;
+                renderBoard();
+            } else {
+                const piece = chess.get(squareName);
+                if (piece && piece.color === playerColor) {
+                    selectedSquare = squareName;
+                    renderBoard();
+                }
+            }
+        }
+        
+        function handleMove(move) {
+            lastMove = { from: move.from, to: move.to };
+            updateScore(move);
+            updateMovesCount();
+            lastMoveElement.textContent = move.san;
+            renderBoard();
+            updateGameStatus();
+
+            if (!gameOver) {
+                if (chess.turn() !== playerColor) {
+                    gameStatusElement.textContent = "AI is thinking...";
+                    makeAIMove();
+                }
+            }
+        }
+        
+        function highlightPossibleMoves(fromSquare) {
+            const moves = chess.moves({ square: fromSquare, verbose: true });
+            moves.forEach(move => {
+                document.getElementById(move.to)?.classList.add('possible-move');
+            });
+        }
+
+        function makeAIMove() {
+            if (gameOver || chess.turn() === playerColor) return;
+            aiWorker.postMessage({ fen: chess.fen(), depth: 4 });
+        }
+
+        function updateScore(move) {
+            if (move.captured) {
+                const pieceValue = PIECE_VALUES[move.captured.toLowerCase()];
+                if (move.color === 'w') {
+                    whiteScore += pieceValue;
+                } else {
+                    blackScore += pieceValue;
+                }
+                whiteScoreElement.textContent = whiteScore;
+                blackScoreElement.textContent = blackScore;
+            }
+        }
+
+        function updateMovesCount() {
+            if (chess.turn() === 'b') whiteMoves--;
+            else blackMoves--;
+            whiteMovesElement.textContent = whiteMoves;
+            blackMovesElement.textContent = blackMoves;
+        }
+
+        function updateGameStatus() {
+            let status = '';
+            let isGameOver = false;
+            if (chess.in_checkmate()) {
+                status = `Checkmate! ${chess.turn() === 'w' ? 'Black' : 'White'} wins.`;
+                isGameOver = true;
+            } else if (chess.in_draw() || chess.in_stalemate() || chess.in_threefold_repetition()) {
+                status = 'Game over: Draw.';
+                isGameOver = true;
+            } else if (whiteMoves <= 0 && blackMoves <= 0) {
+                 isGameOver = true;
+                 if (whiteScore > blackScore) status = "Game Over! White wins on points.";
+                 else if (blackScore > whiteScore) status = "Game Over! Black wins on points.";
+                 else status = "Game Over! It's a draw on points.";
+            } else {
+                const turnColor = chess.turn() === 'w' ? 'White' : 'Black';
+                const playerIdentifier = chess.turn() === playerColor ? '(Your Turn)' : '(AI\'s Turn)';
+                status = `${turnColor}'s Turn ${playerIdentifier}`;
+                if(chess.in_check()) status += ' (Check)';
+            }
+            gameStatusElement.textContent = status;
+            if(isGameOver) {
+                gameOver = true;
+            }
+        }
+
+        function resetGame(fen) {
+            const valid = chess.load(fen);
+            if (!valid) {
+                alert("There was an error starting the game with the custom position. Please try again.");
+                return;
+            }
             
-            startGameBtn.on('click', function() {
-                if(isSetupMode) {
-                    isSetupMode = false; // Exit setup mode
-                    setupPanel.addClass('hidden');
-                    setupModeBtn.text('Enter Setup').addClass('btn-secondary').removeClass('btn-primary');
-                }
-                moveCount = 0;
-                scores = { w: 0, b: 0 };
-                updateStatus(); // This will increment moveCount to 1
-                startTimer();
-                $(this).prop('disabled', true);
-                resetGameBtn.prop('disabled', false);
-            });
-
-            resetGameBtn.on('click', resetGame);
+            selectedSquare = null;
+            whiteMoves = 6;
+            blackMoves = 6;
+            whiteScore = 0;
+            blackScore = 0;
+            gameOver = false;
+            lastMove = null;
             
-            clearBoardBtn.on('click', () => {
-                if(isSetupMode) {
-                    game.clear();
-                    board.clear();
+            renderBoard();
+            updateGameStatus();
+
+            if (chess.turn() !== playerColor && !gameOver) {
+                gameStatusElement.textContent = "AI is thinking...";
+                makeAIMove();
+            }
+        }
+
+        // --- Board Setup Logic ---
+
+        async function showSetupModal() {
+            document.body.classList.add('modal-open');
+            renderSetupBoard();
+            populateLabels('setup-rank-labels', 'setup-file-labels');
+            setupModal.classList.remove('opacity-0', 'pointer-events-none');
+            modalContent.classList.remove('scale-95');
+            
+            if (db) {
+                await createNewSession();
+            }
+        }
+
+        function hideSetupModal() {
+            document.body.classList.remove('modal-open');
+            setupModal.classList.add('opacity-0', 'pointer-events-none');
+            modalContent.classList.add('scale-95');
+            if (unsubscribeFromSession) {
+                unsubscribeFromSession();
+                unsubscribeFromSession = null;
+            }
+            currentSessionId = null;
+        }
+
+        function renderSetupBoard() {
+            setupBoardElement.innerHTML = '';
+            for (let i = 0; i < 8; i++) {
+                for (let j = 0; j < 8; j++) {
+                    const squareEl = document.createElement('div');
+                    const squareName = 'abcdefgh'[j] + (8 - i);
+                    squareEl.className = `square ${(i + j) % 2 === 0 ? 'light' : 'dark'}`;
+                    squareEl.dataset.square = squareName;
+                    
+                    if (setupBoardState[squareName]) {
+                        const pieceKey = setupBoardState[squareName];
+                        squareEl.innerHTML = `<span class="piece ${pieceKey.startsWith('w') ? 'white' : 'black'}">${PIECE_UNICODE[pieceKey]}</span>`;
+                    }
+                    setupBoardElement.appendChild(squareEl);
                 }
+            }
+        }
+        
+        function updateBoardFromFen(fen) {
+            try {
+                const tempChess = new Chess(fen);
+                setupBoardState = {};
+                tempChess.board().forEach((row, rowIndex) => {
+                    row.forEach((piece, colIndex) => {
+                        if (piece) {
+                            const squareName = 'abcdefgh'[colIndex] + (8 - rowIndex);
+                            setupBoardState[squareName] = piece.color + piece.type.toUpperCase();
+                        }
+                    });
+                });
+                renderSetupBoard();
+                if(currentSessionId) {
+                    updateSessionInDb();
+                }
+            } catch (e) {
+                 console.error("Invalid FEN:", e);
+            }
+        }
+        
+        function generateFenFromSetup() {
+            let fen = '';
+            let whiteKing = false;
+            let blackKing = false;
+
+            for (let i = 8; i >= 1; i--) {
+                let emptyCount = 0;
+                for (let j = 0; j < 8; j++) {
+                    const file = 'abcdefgh'[j];
+                    const squareName = file + i;
+                    const pieceKey = setupBoardState[squareName];
+
+                    if (pieceKey) {
+                        if (emptyCount > 0) fen += emptyCount;
+                        emptyCount = 0;
+                        const color = pieceKey[0];
+                        const type = pieceKey[1];
+                        fen += color === 'w' ? type.toUpperCase() : type.toLowerCase();
+                        if (type === 'K') {
+                            if (color === 'w') whiteKing = true;
+                            else blackKing = true;
+                        }
+                    } else {
+                        emptyCount++;
+                    }
+                }
+                if (emptyCount > 0) fen += emptyCount;
+                if (i > 1) fen += '/';
+            }
+
+            if (!whiteKing || !blackKing) {
+                alert("Invalid position: Both a white and a black king must be on the board.");
+                return null;
+            }
+
+            fen += ` ${playerColor} - - 0 1`;
+            return fen;
+        }
+
+        // --- Radial Menu Logic ---
+        function showRadialMenu(x, y, targetSquare) {
+            radialMenu.innerHTML = '';
+            radialMenu.style.display = 'block';
+            radialMenu.style.left = `${x - 75}px`;
+            radialMenu.style.top = `${y - 75}px`;
+            activeRadialTarget = targetSquare;
+
+            const angleStep = 360 / RADIAL_PIECES.length;
+            RADIAL_PIECES.forEach((pieceKey, index) => {
+                const angle = angleStep * index - 90; // Start from top
+                const itemX = 60 * Math.cos(angle * Math.PI / 180);
+                const itemY = 60 * Math.sin(angle * Math.PI / 180);
+
+                const item = document.createElement('div');
+                item.className = 'radial-item';
+                item.style.transform = `translate(${itemX}px, ${itemY}px)`;
+                item.dataset.piece = pieceKey;
+
+                if (pieceKey) {
+                    item.innerHTML = `<span class="piece ${pieceKey.startsWith('w') ? 'white' : 'black'}">${PIECE_UNICODE[pieceKey]}</span>`;
+                } else {
+                    item.innerHTML = `<span class="text-red-500 text-4xl">×</span>`;
+                }
+                radialMenu.appendChild(item);
+            });
+        }
+
+        function hideRadialMenu() {
+            radialMenu.style.display = 'none';
+            activeRadialTarget = null;
+        }
+
+        function handleRadialSelection(selectedPiece) {
+            if (activeRadialTarget) {
+                if (selectedPiece) {
+                    setupBoardState[activeRadialTarget] = selectedPiece;
+                } else {
+                    delete setupBoardState[activeRadialTarget];
+                }
+                renderSetupBoard();
+                if (currentSessionId) {
+                    updateSessionInDb();
+                }
+            }
+        }
+
+        function populateLabels(rankId, fileId) {
+            const rankContainer = document.getElementById(rankId);
+            const fileContainer = document.getElementById(fileId);
+            if (!rankContainer || !fileContainer) return;
+
+            rankContainer.innerHTML = '';
+            fileContainer.innerHTML = '';
+
+            const ranks = '87654321';
+            ranks.split('').forEach(r => {
+                const label = document.createElement('div');
+                label.className = 'h-full flex items-center justify-center';
+                label.textContent = r;
+                rankContainer.appendChild(label);
             });
 
-            // --- Initial Setup ---
-            resetGame(); // Start with a fresh game state
+            const files = 'abcdefgh';
+            files.split('').forEach(f => {
+                const label = document.createElement('div');
+                label.className = 'w-full text-center';
+                label.textContent = f;
+                fileContainer.appendChild(label);
+            });
+        }
+        
+        // --- Firebase Session Logic ---
+        async function createNewSession() {
+            if (!db) return;
+            if (unsubscribeFromSession) unsubscribeFromSession();
+            
+            try {
+                const newId = String(Math.floor(1000 + Math.random() * 9000));
+                const sessionRef = doc(db, "sessions", newId);
+                await setDoc(sessionRef, { boardState: {} });
+
+                currentSessionId = newId;
+                sessionIdDisplay.textContent = currentSessionId;
+                listenToSession(currentSessionId);
+            } catch (e) {
+                console.error("Error creating session:", e);
+                alert("Could not create a new collaborative session.");
+            }
+        }
+
+        function joinSession() {
+            if (!db) return;
+            const idToJoin = joinSessionInput.value.trim();
+            if (idToJoin) {
+                if (unsubscribeFromSession) unsubscribeFromSession();
+                currentSessionId = idToJoin;
+                sessionIdDisplay.textContent = currentSessionId;
+                listenToSession(currentSessionId);
+                joinSessionInput.value = "";
+            }
+        }
+
+        function listenToSession(sessionId) {
+            if (!db) return;
+            const sessionRef = doc(db, "sessions", sessionId);
+            unsubscribeFromSession = onSnapshot(sessionRef, (doc) => {
+                if (doc.exists()) {
+                    const data = doc.data();
+                    setupBoardState = data.boardState || {};
+                    renderSetupBoard();
+                } else {
+                    console.warn("Session does not exist.");
+                    alert("The entered Session ID does not exist.");
+                    if(unsubscribeFromSession) unsubscribeFromSession();
+                    createNewSession(); // Create a new session for this user
+                }
+            });
+        }
+
+        async function updateSessionInDb() {
+            if (!db || !currentSessionId) return;
+            const sessionRef = doc(db, "sessions", currentSessionId);
+            try {
+                await setDoc(sessionRef, { boardState: setupBoardState });
+            } catch (e) {
+                console.error("Error updating session:", e);
+            }
+        }
+
+
+        // --- Event Listeners ---
+        newGameBtn.addEventListener('click', showSetupModal);
+        cancelSetupBtn.addEventListener('click', hideSetupModal);
+        
+        setupBoardElement.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            const target = e.target.closest('.square');
+            if(target) {
+                showRadialMenu(e.clientX, e.clientY, target.dataset.square);
+            }
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (radialMenu.style.display === 'block') {
+                let highlightedItem = null;
+                document.querySelectorAll('.radial-item').forEach(item => {
+                    const rect = item.getBoundingClientRect();
+                    if (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom) {
+                        item.classList.add('highlighted');
+                        highlightedItem = item;
+                    } else {
+                        item.classList.remove('highlighted');
+                    }
+                });
+            }
+        });
+        
+        window.addEventListener('mouseup', (e) => {
+            if (radialMenu.style.display === 'block') {
+                const highlightedItem = document.querySelector('.radial-item.highlighted');
+                if (highlightedItem) {
+                    handleRadialSelection(highlightedItem.dataset.piece === 'null' ? null : highlightedItem.dataset.piece);
+                }
+                hideRadialMenu();
+            }
+        });
+
+        colorSelector.addEventListener('click', (e) => {
+            const button = e.target.closest('button');
+            if (button) {
+                playerColor = button.dataset.color;
+                document.querySelectorAll('#color-selector button').forEach(btn => {
+                    btn.classList.remove('bg-indigo-600', 'text-white');
+                    btn.classList.add('text-gray-300');
+                });
+                button.classList.add('bg-indigo-600', 'text-white');
+                button.classList.remove('text-gray-300');
+            }
+        });
+
+        clearBoardBtn.addEventListener('click', () => {
+            setupBoardState = {};
+            renderSetupBoard();
+            if(currentSessionId) updateSessionInDb();
+        });
+
+        resetStandardBtn.addEventListener('click', () => {
+            updateBoardFromFen('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1');
+        });
+
+        joinSessionBtn.addEventListener('click', joinSession);
+
+        startGameBtn.addEventListener('click', () => {
+            const fen = generateFenFromSetup();
+            if (fen) {
+                hideSetupModal();
+                resetGame(fen);
+            }
+        });
+
+        // --- Initial Load ---
+        initFirebase().then(() => {
+            aiWorker = createAIWorker();
+            aiWorker.onmessage = (e) => {
+                const bestMove = e.data;
+                const result = chess.move(bestMove);
+                if (result) {
+                    handleMove(result);
+                } else {
+                    const fallbackMove = chess.moves()[0];
+                    if (fallbackMove) {
+                        handleMove(chess.move(fallbackMove));
+                    }
+                }
+            };
+            renderBoard();
+            populateLabels('main-rank-labels', 'main-file-labels');
+            gameStatusElement.textContent = 'Click "Setup New Game" to begin!';
         });
     </script>
-
 </body>
 </html>
