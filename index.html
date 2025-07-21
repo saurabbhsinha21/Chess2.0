@@ -13,9 +13,32 @@
         body {
             font-family: 'Inter', sans-serif;
         }
-        /* Prevents body scrolling when a modal is open */
         body.modal-open {
             overflow: hidden;
+        }
+        .chess-board-wrapper {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            grid-template-rows: 1fr auto;
+            gap: 0.5rem;
+            width: 100%;
+            max-width: 600px;
+        }
+        .rank-labels {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-around;
+            text-align: center;
+            font-family: 'Roboto Mono', monospace;
+            color: #9ca3af;
+        }
+        .file-labels {
+            display: flex;
+            justify-content: space-around;
+            text-align: center;
+            font-family: 'Roboto Mono', monospace;
+            color: #9ca3af;
+            grid-column-start: 2;
         }
         .chess-board {
             display: grid;
@@ -23,9 +46,9 @@
             grid-template-rows: repeat(8, 1fr);
             width: 100%;
             aspect-ratio: 1 / 1;
-            border: 2px solid #4a5568; /* gray-700 */
             border-radius: 0.5rem;
             overflow: hidden;
+            grid-column-start: 2;
         }
         .square {
             display: flex;
@@ -47,18 +70,9 @@
             background-color: rgba(107, 114, 128, 0.5);
         }
         .piece { cursor: pointer; }
-        .piece.black { color: #1f2937; } /* gray-800 */
-        .piece.white { color: #f9fafb; } /* gray-50 */
+        .piece.black { color: #1f2937; }
+        .piece.white { color: #f9fafb; }
 
-        /* Modal Styles */
-        .modal {
-            transition: opacity 0.25s ease;
-        }
-        .modal-content {
-            transition: transform 0.25s ease;
-        }
-        
-        /* Radial Menu Styles */
         #radial-menu {
             position: fixed;
             width: 150px;
@@ -94,16 +108,14 @@
 
     <div class="w-full max-w-5xl mx-auto flex flex-col lg:flex-row gap-8">
         
-        <!-- Game Board and Info -->
         <div class="flex-grow flex flex-col items-center">
             <h1 class="text-3xl font-bold mb-2 text-center">6-Move Chess Challenge</h1>
             <div id="game-status" class="h-8 mb-2 text-xl font-semibold text-yellow-300">Setup a new game to begin!</div>
             
-            <div class="grid grid-cols-[auto_1fr] grid-rows-[1fr_auto] gap-x-2 gap-y-1 w-full max-w-[600px]">
-                <div id="main-rank-labels" class="flex flex-col justify-around text-center text-gray-400 text-sm font-mono"></div>
-                <div id="chess-board" class="chess-board shadow-2xl col-start-2"></div>
-                <div></div> <!-- empty corner -->
-                <div id="main-file-labels" class="flex justify-around text-center text-gray-400 text-sm font-mono col-start-2"></div>
+            <div class="chess-board-wrapper">
+                <div id="main-rank-labels" class="rank-labels"></div>
+                <div id="chess-board" class="chess-board shadow-2xl"></div>
+                <div class="file-labels" id="main-file-labels"></div>
             </div>
 
             <div class="w-full mt-4 flex justify-center">
@@ -113,10 +125,8 @@
             </div>
         </div>
 
-        <!-- Game State & Rules -->
         <div class="w-full lg:w-80 flex-shrink-0 bg-gray-800 p-6 rounded-lg shadow-xl">
             <h2 class="text-2xl font-bold border-b-2 border-gray-600 pb-2 mb-4">Game Info</h2>
-            
             <div class="space-y-4">
                 <div>
                     <h3 class="text-lg font-semibold">Moves Remaining</h3>
@@ -125,7 +135,6 @@
                         <span>Black: <strong id="black-moves" class="text-2xl">6</strong></span>
                     </div>
                 </div>
-
                 <div>
                     <h3 class="text-lg font-semibold">Points</h3>
                     <div class="flex justify-between bg-gray-700 p-3 rounded-lg">
@@ -133,13 +142,11 @@
                         <span>Black: <strong id="black-score" class="text-2xl">0</strong></span>
                     </div>
                 </div>
-
                 <div>
                     <h3 class="text-lg font-semibold">Last Move</h3>
                     <div id="last-move" class="bg-gray-700 p-3 rounded-lg h-12 font-mono">--</div>
                 </div>
             </div>
-
             <div class="mt-6 pt-4 border-t border-gray-600">
                 <h3 class="text-lg font-bold mb-2">Points System</h3>
                 <ul class="text-sm space-y-1 text-gray-300">
@@ -153,27 +160,23 @@
         </div>
     </div>
 
-    <!-- Board Setup Modal -->
-    <div id="setup-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 z-50 opacity-0 pointer-events-none">
-        <div id="modal-content" class="bg-gray-800 rounded-2xl shadow-2xl p-8 w-full max-w-4xl transform scale-95 overflow-y-auto max-h-full">
-            <h2 class="text-3xl font-bold text-center mb-6">Collaborative Setup</h2>
-            <p class="text-center text-gray-400 mb-4">Share the Session ID with a friend to set up the board together in real-time.</p>
+    <div id="setup-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 z-50 hidden">
+        <div id="modal-content" class="bg-gray-800 rounded-2xl shadow-2xl p-8 w-full max-w-4xl transform scale-100 overflow-y-auto max-h-full">
+            <h2 class="text-3xl font-bold text-center mb-6">Rapid Board Setup</h2>
+            <p class="text-center text-gray-400 mb-4">Press and hold on a square, then drag to a piece to place it.</p>
             
             <div class="flex flex-col md:flex-row gap-6">
-                <!-- Setup Board -->
                 <div class="flex-grow">
-                     <div class="grid grid-cols-[auto_1fr] grid-rows-[1fr_auto] gap-x-2 gap-y-1 w-full">
-                        <div id="setup-rank-labels" class="flex flex-col justify-around text-center text-gray-400 text-sm font-mono"></div>
-                        <div id="setup-board" class="chess-board border-gray-600 col-start-2"></div>
-                        <div></div> <!-- empty corner -->
-                        <div id="setup-file-labels" class="flex justify-around text-center text-gray-400 text-sm font-mono col-start-2"></div>
+                     <div class="chess-board-wrapper">
+                        <div id="setup-rank-labels" class="rank-labels"></div>
+                        <div id="setup-board" class="chess-board border-gray-600"></div>
+                        <div id="setup-file-labels" class="file-labels"></div>
                     </div>
                 </div>
 
-                <!-- Controls -->
                 <div class="w-full md:w-56 flex-shrink-0">
-                    <div id="setup-controls" class="space-y-6">
-                        <div>
+                    <div class="space-y-6">
+                         <div>
                             <h3 class="text-xl font-semibold mb-2">Session ID</h3>
                             <div class="bg-gray-900 p-2 rounded-lg text-center">
                                 <span id="session-id-display" class="font-mono text-lg text-yellow-300"></span>
@@ -195,9 +198,9 @@
                         </div>
 
                         <div class="space-y-3">
-                            <button id="start-game-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition-transform transform hover:scale-105">Start Game</button>
+                            <button id="start-game-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg">Start Game</button>
                             <button id="clear-board-btn" class="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg">Clear Board</button>
-                             <button id="reset-standard-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Standard Position</button>
+                            <button id="reset-standard-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Standard Position</button>
                             <button id="cancel-setup-btn" class="w-full bg-red-600 hover:red-700 text-white font-bold py-2 px-4 rounded-lg mt-2">Cancel</button>
                         </div>
                     </div>
@@ -215,28 +218,27 @@
         import { getFirestore, doc, setDoc, onSnapshot, addDoc, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- DOM Elements ---
-        const boardElement = document.getElementById('chess-board');
-        const setupBoardElement = document.getElementById('setup-board');
-        const gameStatusElement = document.getElementById('game-status');
-        const whiteMovesElement = document.getElementById('white-moves');
-        const blackMovesElement = document.getElementById('black-moves');
-        const whiteScoreElement = document.getElementById('white-score');
-        const blackScoreElement = document.getElementById('black-score');
-        const lastMoveElement = document.getElementById('last-move');
-        const newGameBtn = document.getElementById('new-game-btn');
-        
-        // Modal elements
-        const setupModal = document.getElementById('setup-modal');
-        const modalContent = document.getElementById('modal-content');
-        const colorSelector = document.getElementById('color-selector');
-        const startGameBtn = document.getElementById('start-game-btn');
-        const clearBoardBtn = document.getElementById('clear-board-btn');
-        const resetStandardBtn = document.getElementById('reset-standard-btn');
-        const cancelSetupBtn = document.getElementById('cancel-setup-btn');
-        const radialMenu = document.getElementById('radial-menu');
-        const sessionIdDisplay = document.getElementById('session-id-display');
-        const joinSessionInput = document.getElementById('join-session-input');
-        const joinSessionBtn = document.getElementById('join-session-btn');
+        const getEl = (id) => document.getElementById(id);
+        const gameStatusElement = getEl('game-status');
+        const whiteMovesElement = getEl('white-moves');
+        const blackMovesElement = getEl('black-moves');
+        const whiteScoreElement = getEl('white-score');
+        const blackScoreElement = getEl('black-score');
+        const lastMoveElement = getEl('last-move');
+        const newGameBtn = getEl('new-game-btn');
+        const setupModal = getEl('setup-modal');
+        const startGameBtn = getEl('start-game-btn');
+        const clearBoardBtn = getEl('clear-board-btn');
+        const resetStandardBtn = getEl('reset-standard-btn');
+        const cancelSetupBtn = getEl('cancel-setup-btn');
+        const colorSelector = getEl('color-selector');
+        const radialMenu = getEl('radial-menu');
+        const sessionIdDisplay = getEl('session-id-display');
+        const joinSessionInput = getEl('join-session-input');
+        const joinSessionBtn = getEl('join-session-btn');
+        const boardElement = getEl('chess-board');
+        const setupBoardElement = getEl('setup-board');
+        const modalContent = getEl('modal-content');
         
         // --- Firebase State ---
         let db, auth;
@@ -260,15 +262,13 @@
         let activeRadialTarget = null;
 
         // --- Constants ---
-        const PIECE_VALUES = { 'p': 100, 'n': 320, 'b': 330, 'r': 500, 'q': 900, 'k': 20000 };
         const PIECE_UNICODE = {
             'wP': '♙', 'wN': '♘', 'wB': '♗', 'wR': '♖', 'wQ': '♕', 'wK': '♔',
             'bP': '♟', 'bN': '♞', 'bB': '♝', 'bR': '♜', 'bQ': '♛', 'bK': '♚'
         };
         const RADIAL_PIECES = [
-            'wP', 'wN', 'wB', 'wR', 'wQ', 'wK',
-            'bP', 'bN', 'bB', 'bR', 'bQ', 'bK',
-            null // For eraser
+            'wK', 'wQ', 'wR', 'wB', 'wN', 'wP', null,
+            'bK', 'bQ', 'bR', 'bB', 'bN', 'bP'
         ];
 
         // --- AI Worker Setup ---
