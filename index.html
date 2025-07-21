@@ -385,7 +385,7 @@
                 await signInAnonymously(auth);
             } catch (e) {
                 console.error("Firebase initialization failed:", e);
-                alert(`Could not connect to the collaboration service. Error: ${e.message}`);
+                alert('Could not connect to the collaboration service. Error: ' + e.message);
             }
         }
 
@@ -399,7 +399,7 @@
                     const squareEl = document.createElement('div');
                     const squareName = 'abcdefgh'[j] + (8 - i);
                     squareEl.id = squareName;
-                    squareEl.className = `square ${(i + j) % 2 === 0 ? 'light' : 'dark'}`;
+                    squareEl.className = 'square ' + ((i + j) % 2 === 0 ? 'light' : 'dark');
                     
                     if (lastMove && (squareName === lastMove.from || squareName === lastMove.to)) {
                         squareEl.classList.add('last-move-highlight');
@@ -408,7 +408,7 @@
                     const piece = board[i][j];
                     if (piece) {
                         const pieceElement = document.createElement('span');
-                        pieceElement.className = `piece ${piece.color === 'w' ? 'white' : 'black'}`;
+                        pieceElement.className = 'piece ' + (piece.color === 'w' ? 'white' : 'black');
                         pieceElement.innerText = PIECE_UNICODE[piece.color + piece.type.toUpperCase()];
                         squareEl.appendChild(pieceElement);
                     }
@@ -496,7 +496,7 @@
             let status = '';
             let isGameOver = false;
             if (chess.in_checkmate()) {
-                status = `Checkmate! ${chess.turn() === 'w' ? 'Black' : 'White'} wins.`;
+                status = 'Checkmate! ' + (chess.turn() === 'w' ? 'Black' : 'White') + ' wins.';
                 isGameOver = true;
             } else if (chess.in_draw() || chess.in_stalemate() || chess.in_threefold_repetition()) {
                 status = 'Game over: Draw.';
@@ -509,7 +509,7 @@
             } else {
                 const turnColor = chess.turn() === 'w' ? 'White' : 'Black';
                 const playerIdentifier = chess.turn() === playerColor ? '(Your Turn)' : '(AI\'s Turn)';
-                status = `${turnColor}'s Turn ${playerIdentifier}`;
+                status = turnColor + '\'s Turn ' + playerIdentifier;
                 if(chess.in_check()) status += ' (Check)';
             }
             gameStatusElement.textContent = status;
@@ -548,8 +548,7 @@
             document.body.classList.add('modal-open');
             renderSetupBoard();
             populateLabels('setup-rank-labels', 'setup-file-labels');
-            setupModal.classList.remove('opacity-0', 'pointer-events-none');
-            modalContent.classList.remove('scale-95');
+            setupModal.classList.remove('hidden');
             
             if (db) {
                 await createNewSession();
@@ -558,8 +557,7 @@
 
         function hideSetupModal() {
             document.body.classList.remove('modal-open');
-            setupModal.classList.add('opacity-0', 'pointer-events-none');
-            modalContent.classList.add('scale-95');
+            setupModal.classList.add('hidden');
             if (unsubscribeFromSession) {
                 unsubscribeFromSession();
                 unsubscribeFromSession = null;
@@ -574,12 +572,12 @@
                 for (let j = 0; j < 8; j++) {
                     const squareEl = document.createElement('div');
                     const squareName = 'abcdefgh'[j] + (8 - i);
-                    squareEl.className = `square ${(i + j) % 2 === 0 ? 'light' : 'dark'}`;
+                    squareEl.className = 'square ' + ((i + j) % 2 === 0 ? 'light' : 'dark');
                     squareEl.dataset.square = squareName;
                     
                     if (setupBoardState[squareName]) {
                         const pieceKey = setupBoardState[squareName];
-                        squareEl.innerHTML = `<span class="piece ${pieceKey.startsWith('w') ? 'white' : 'black'}">${PIECE_UNICODE[pieceKey]}</span>`;
+                        squareEl.innerHTML = '<span class="piece ' + (pieceKey.startsWith('w') ? 'white' : 'black') + '">' + PIECE_UNICODE[pieceKey] + '</span>';
                     }
                     setupBoardElement.appendChild(squareEl);
                 }
@@ -642,7 +640,7 @@
                 return null;
             }
 
-            fen += ` ${playerColor} - - 0 1`;
+            fen += ' ' + playerColor + ' - - 0 1';
             return fen;
         }
 
@@ -650,8 +648,8 @@
         function showRadialMenu(x, y, targetSquare) {
             radialMenu.innerHTML = '';
             radialMenu.style.display = 'block';
-            radialMenu.style.left = `${x - 75}px`;
-            radialMenu.style.top = `${y - 75}px`;
+            radialMenu.style.left = (x - 75) + 'px';
+            radialMenu.style.top = (y - 75) + 'px';
             activeRadialTarget = targetSquare;
 
             const angleStep = 360 / RADIAL_PIECES.length;
@@ -662,13 +660,13 @@
 
                 const item = document.createElement('div');
                 item.className = 'radial-item';
-                item.style.transform = `translate(${itemX}px, ${itemY}px)`;
+                item.style.transform = 'translate(' + itemX + 'px, ' + itemY + 'px)';
                 item.dataset.piece = pieceKey;
 
                 if (pieceKey) {
-                    item.innerHTML = `<span class="piece ${pieceKey.startsWith('w') ? 'white' : 'black'}">${PIECE_UNICODE[pieceKey]}</span>`;
+                    item.innerHTML = '<span class="piece ' + (pieceKey.startsWith('w') ? 'white' : 'black') + '">' + PIECE_UNICODE[pieceKey] + '</span>';
                 } else {
-                    item.innerHTML = `<span class="text-red-500 text-4xl">×</span>`;
+                    item.innerHTML = '<span class="text-red-500 text-4xl">×</span>';
                 }
                 radialMenu.appendChild(item);
             });
