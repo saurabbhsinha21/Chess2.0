@@ -364,7 +364,7 @@
 
         function updateScore(move) {
             if (move.captured) {
-                const pieceValue = SCORE_VALUES[move.captured.toLowerCase()];
+                const pieceValue = SCORE_VALUES[move.captured];
                 if (pieceValue) { // Check if a valid piece was captured
                     if (move.color === 'w') {
                         whiteScore += pieceValue;
@@ -452,11 +452,22 @@
 
         function renderSetupBoard() {
             setupBoardElement.innerHTML = '';
+            const orientation = playerColor === 'w' ? 'white' : 'black';
+            
+            const files = orientation === 'white' ? 'abcdefgh'.split('') : 'hgfedcba'.split('');
+            const ranks = orientation === 'white' ? '87654321'.split('') : '12345678'.split('');
+
             for (let i = 0; i < 8; i++) {
                 for (let j = 0; j < 8; j++) {
+                    const rank = ranks[i];
+                    const file = files[j];
+                    const squareName = file + rank;
+                    
                     const squareEl = document.createElement('div');
-                    const squareName = 'abcdefgh'[j] + (8 - i);
-                    squareEl.className = `square ${(i + j) % 2 === 0 ? 'light' : 'dark'}`;
+
+                    const fileIndex = 'abcdefgh'.indexOf(file);
+                    const rankIndex = '87654321'.indexOf(rank);
+                    squareEl.className = `square ${(fileIndex + rankIndex) % 2 === 0 ? 'light' : 'dark'}`;
                     squareEl.dataset.square = squareName;
                     
                     if (setupBoardState[squareName]) {
