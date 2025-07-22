@@ -233,7 +233,7 @@
         let activeRadialTarget = null;
 
         // --- Constants ---
-        const PIECE_VALUES = { 'p': 1, 'n': 3, 'b': 3, 'r': 5, 'q': 9 };
+        const SCORE_VALUES = { 'p': 1, 'n': 3, 'b': 3, 'r': 5, 'q': 9 };
         const PIECE_UNICODE = {
             'wP': '♙', 'wN': '♘', 'wB': '♗', 'wR': '♖', 'wQ': '♕', 'wK': '♔',
             'bP': '♟', 'bN': '♞', 'bB': '♝', 'bR': '♜', 'bQ': '♛', 'bK': '♚'
@@ -364,14 +364,16 @@
 
         function updateScore(move) {
             if (move.captured) {
-                const pieceValue = PIECE_VALUES[move.captured.toLowerCase()];
-                if (move.color === 'w') {
-                    whiteScore += pieceValue;
-                } else {
-                    blackScore += pieceValue;
+                const pieceValue = SCORE_VALUES[move.captured.toLowerCase()];
+                if (pieceValue) { // Check if a valid piece was captured
+                    if (move.color === 'w') {
+                        whiteScore += pieceValue;
+                    } else {
+                        blackScore += pieceValue;
+                    }
+                    whiteScoreElement.textContent = whiteScore;
+                    blackScoreElement.textContent = blackScore;
                 }
-                whiteScoreElement.textContent = whiteScore;
-                blackScoreElement.textContent = blackScore;
             }
         }
 
