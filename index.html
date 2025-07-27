@@ -140,6 +140,7 @@
             <div class="space-y-4">
                 <div>
                     <h3 class="text-lg font-semibold">FEN Code</h3>
+                    <p id="fen-prefix" class="text-sm text-gray-400 mb-1"></p>
                     <div class="flex gap-2">
                         <input type="text" id="main-fen-display" readonly class="w-full bg-gray-700 text-white rounded-lg p-2 text-xs font-mono">
                         <button id="main-copy-fen-btn" class="bg-gray-600 hover:bg-gray-700 text-white font-bold p-2 rounded-lg">Copy</button>
@@ -230,6 +231,7 @@
         const sessionIdDisplay = getEl('session-id-display');
         const joinSessionInput = getEl('join-session-input');
         const joinSessionBtn = getEl('join-session-btn');
+        const fenPrefix = getEl('fen-prefix');
         
         // --- Firebase State ---
         let db, auth;
@@ -480,6 +482,8 @@
         }
 
         function updateMainFenDisplay() {
+            const turnColor = chess.turn() === 'w' ? 'White' : 'Black';
+            fenPrefix.textContent = 'Suggest best move for ' + turnColor;
             mainFenDisplay.value = chess.fen();
         }
 
@@ -684,8 +688,15 @@
         });
 
         mainCopyFenBtn.addEventListener('click', () => {
-            mainFenDisplay.select();
+            const turnColor = chess.turn() === 'w' ? 'White' : 'Black';
+            const textToCopy = 'Suggest best move for ' + turnColor + ' - ' + chess.fen();
+            const tempTextArea = document.createElement('textarea');
+            tempTextArea.value = textToCopy;
+            document.body.appendChild(tempTextArea);
+            tempTextArea.select();
             document.execCommand('copy');
+            document.body.removeChild(tempTextArea);
+
             mainCopyFenBtn.textContent = 'Copied!';
             setTimeout(() => {
                 mainCopyFenBtn.textContent = 'Copy';
